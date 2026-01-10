@@ -1,0 +1,82 @@
+# T4 GPU (SM75 / Turing architecture)
+matcherConfig:
+  exactMatch: true
+  labelMatchers:
+    - [self-hosted, linux, x64, gpu, sm75]
+    - [self-hosted, linux, x64, gpu, t4]
+    - [self-hosted, linux, x64, gpu, turing]
+  priority: 1
+fifo: true
+
+runner_config:
+  runner_os: linux
+  runner_architecture: x64
+  runner_name_prefix: flashinfer-gpu-g4dn-
+  
+  enable_organization_runners: true
+  
+  # Multiple labels for flexible targeting
+  runner_extra_labels:
+    - gpu
+    - nvidia
+    - t4
+    - sm75
+    - turing
+  
+  enable_ephemeral_runners: false
+  
+  # G4dn instances have NVIDIA T4 GPUs
+  instance_types:
+    - g4dn.xlarge
+    - g4dn.2xlarge
+  
+  instance_target_capacity_type: spot
+  instance_allocation_strategy: price-capacity-optimized
+  enable_on_demand_failover_for_errors:
+    - InsufficientInstanceCapacity
+  
+  runners_maximum_count: 5
+  delay_webhook_event: 30
+  scale_down_schedule_expression: "cron(*/5 * * * ? *)"
+  minimum_running_time_in_minutes: 15
+  runner_boot_time_in_minutes: 10  # GPU instances need more boot time
+  
+  # Use AWS Deep Learning AMI with Ubuntu 22.04 (has NVIDIA drivers pre-installed)
+  ami:
+    owners:
+      - "898082745236"  # AWS Deep Learning AMI owner
+    filter:
+      name:
+        - "Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.* (Ubuntu 22.04) *"
+      state:
+        - available
+  
+  block_device_mappings:
+    - device_name: /dev/xvda
+      volume_size: 200
+      volume_type: gp3
+      delete_on_termination: true
+      encrypted: true
+  
+  enable_ssm_on_runners: true
+  enable_cloudwatch_agent: true
+  
+  runner_log_files:
+    - log_group_name: syslog
+      prefix_log_group: true
+      file_path: /var/log/syslog
+      log_stream_name: "{instance_id}"
+    - log_group_name: user_data
+      prefix_log_group: true
+      file_path: /var/log/user-data.log
+      log_stream_name: "{instance_id}/user_data"
+  
+  userdata_post_install: |
+    #!/bin/bash
+    # Docker should already be installed in Deep Learning AMI
+    systemctl enable docker
+    systemctl start docker
+    usermod -aG docker ubuntu
+    
+    # Verify NVIDIA driver
+    nvidia-smi
