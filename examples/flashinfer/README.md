@@ -144,3 +144,48 @@ terraform destroy
 
 - [Phase 3 Implementation Plan](../../PHASE3_TERRAFORM_CONFIGURATION.md)
 - [terraform-aws-github-runner docs](https://github-aws-runners.github.io/terraform-aws-github-runner/)
+
+<!-- BEGIN_TF_DOCS -->
+## Requirements
+
+| Name | Version |
+|------|---------|
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.3.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 6.21 |
+| <a name="requirement_random"></a> [random](#requirement\_random) | ~> 3.0 |
+
+## Providers
+
+No providers.
+
+## Modules
+
+| Name | Source | Version |
+|------|--------|---------|
+| <a name="module_base"></a> [base](#module\_base) | ../base | n/a |
+| <a name="module_runners"></a> [runners](#module\_runners) | ../../modules/multi-runner | n/a |
+| <a name="module_webhook_github_app"></a> [webhook\_github\_app](#module\_webhook\_github\_app) | ../../modules/webhook-github-app | n/a |
+
+## Resources
+
+No resources.
+
+## Inputs
+
+| Name | Description | Type | Default | Required |
+|------|-------------|------|---------|:--------:|
+| <a name="input_aws_region"></a> [aws\_region](#input\_aws\_region) | AWS region to deploy to | `string` | `"us-west-2"` | no |
+| <a name="input_github_app_id"></a> [github\_app\_id](#input\_github\_app\_id) | GitHub App ID | `string` | n/a | yes |
+| <a name="input_github_app_key_base64"></a> [github\_app\_key\_base64](#input\_github\_app\_key\_base64) | GitHub App private key (base64 encoded). Generate with: base64 -i your-app.private-key.pem | `string` | n/a | yes |
+| <a name="input_webhook_secret"></a> [webhook\_secret](#input\_webhook\_secret) | Webhook secret for GitHub App. Generate with: openssl rand -hex 32 | `string` | n/a | yes |
+
+## Outputs
+
+| Name | Description |
+|------|-------------|
+| <a name="output_private_subnet_ids"></a> [private\_subnet\_ids](#output\_private\_subnet\_ids) | Private subnet IDs where runners are launched |
+| <a name="output_runners_map"></a> [runners\_map](#output\_runners\_map) | Map of runner configurations and their details |
+| <a name="output_vpc_id"></a> [vpc\_id](#output\_vpc\_id) | VPC ID where runners are deployed |
+| <a name="output_webhook_endpoint"></a> [webhook\_endpoint](#output\_webhook\_endpoint) | Webhook endpoint URL for GitHub App configuration |
+| <a name="output_webhook_secret"></a> [webhook\_secret](#output\_webhook\_secret) | Webhook secret for GitHub App configuration. Use: terraform output -raw webhook\_secret |
+<!-- END_TF_DOCS -->
