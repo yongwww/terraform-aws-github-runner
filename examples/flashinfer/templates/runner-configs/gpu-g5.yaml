@@ -12,9 +12,13 @@ runner_config:
   runner_os: linux
   runner_architecture: x64
   runner_name_prefix: flashinfer-gpu-g5-
-  
+  runner_run_as: ubuntu
+
+  # Use GPU-specific user-data script (Deep Learning AMI has Docker/NVIDIA pre-installed)
+  userdata_template: ./templates/user-data-gpu.sh
+
   enable_organization_runners: true
-  
+
   # Multiple labels for flexible targeting
   runner_extra_labels:
     - gpu
@@ -22,26 +26,26 @@ runner_config:
     - a10g
     - sm86
     - ampere
-  
+
   enable_ephemeral_runners: false
-  
+
   # G5 instances have NVIDIA A10G GPUs
   instance_types:
     - g5.xlarge
     - g5.2xlarge
     - g5.4xlarge
-  
+
   instance_target_capacity_type: spot
   instance_allocation_strategy: price-capacity-optimized
   enable_on_demand_failover_for_errors:
     - InsufficientInstanceCapacity
-  
+
   runners_maximum_count: 10
   delay_webhook_event: 30
   scale_down_schedule_expression: "cron(*/5 * * * ? *)"
   minimum_running_time_in_minutes: 15
-  runner_boot_time_in_minutes: 10
-  
+  runner_boot_time_in_minutes: 15
+
   # Keep 1 GPU runner warm during work hours
   idle_config:
     - cron: "* 17-23 * * 1-5"
@@ -50,7 +54,7 @@ runner_config:
     - cron: "* 0-2 * * 2-6"
       timeZone: "UTC"
       idleCount: 1
-  
+
   # Use AWS Deep Learning AMI with Ubuntu 22.04
   ami:
     owners:
@@ -60,17 +64,17 @@ runner_config:
         - "Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.* (Ubuntu 22.04) *"
       state:
         - available
-  
+
   block_device_mappings:
     - device_name: /dev/xvda
       volume_size: 200
       volume_type: gp3
       delete_on_termination: true
       encrypted: true
-  
+
   enable_ssm_on_runners: true
   enable_cloudwatch_agent: true
-  
+
   runner_log_files:
     - log_group_name: syslog
       prefix_log_group: true
@@ -80,10 +84,5 @@ runner_config:
       prefix_log_group: true
       file_path: /var/log/user-data.log
       log_stream_name: "{instance_id}/user_data"
-  
-  userdata_post_install: |
-    #!/bin/bash
-    systemctl enable docker
-    systemctl start docker
-    usermod -aG docker ubuntu
-    nvidia-smi
+
+  # userdata_post_install is now handled by userdata_template
