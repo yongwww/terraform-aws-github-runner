@@ -50,17 +50,30 @@ usermod -aG docker $user_name
 # First, run nvidia-ctk to add the nvidia runtime
 nvidia-ctk runtime configure --runtime=docker
 
-# Then set nvidia as the default runtime to ensure --gpus all works correctly
-# This is needed because GitHub Actions container jobs use --gpus all
-if [ -f /etc/docker/daemon.json ]; then
-    # Add default-runtime if not already set
-    if ! grep -q '"default-runtime"' /etc/docker/daemon.json; then
-        jq '. + {"default-runtime": "nvidia"}' /etc/docker/daemon.json > /tmp/daemon.json.tmp
-        mv /tmp/daemon.json.tmp /etc/docker/daemon.json
-    fi
-else
-    echo '{"default-runtime": "nvidia", "runtimes": {"nvidia": {"path": "nvidia-container-runtime", "runtimeArgs": []}}}' > /etc/docker/daemon.json
-fi
+# Configure Docker daemon with nvidia runtime and stability settings
+# - default-runtime: nvidia (for --gpus all support)
+# - live-restore: keep containers running during daemon restart
+# - max-concurrent-downloads: limit parallel layer downloads to reduce memory pressure
+# - max-concurrent-uploads: limit parallel layer uploads
+cat > /etc/docker/daemon.json <<'DOCKER_CONFIG'
+{
+    "default-runtime": "nvidia",
+    "runtimes": {
+        "nvidia": {
+            "path": "nvidia-container-runtime",
+            "runtimeArgs": []
+        }
+    },
+    "live-restore": true,
+    "max-concurrent-downloads": 3,
+    "max-concurrent-uploads": 3,
+    "log-driver": "json-file",
+    "log-opts": {
+        "max-size": "100m",
+        "max-file": "3"
+    }
+}
+DOCKER_CONFIG
 
 echo "=== Docker daemon.json ==="
 cat /etc/docker/daemon.json
