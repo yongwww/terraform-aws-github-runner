@@ -46,6 +46,14 @@ systemctl start docker
 # Add ubuntu user to docker group
 usermod -aG docker $user_name
 
+# Configure NVIDIA Container Toolkit for Docker (Deep Learning AMI has it pre-installed)
+nvidia-ctk runtime configure --runtime=docker
+systemctl restart docker
+
+# Quick verification (don't pull external images, just check config)
+echo "=== Docker GPU Runtime Config ==="
+docker info | grep -i runtime || true
+
 # Configure systemd for running service in users accounts
 mkdir -p /etc/systemd/system/user-$user_id.slice.d
 cat > /etc/systemd/system/user-$user_id.slice.d/resources.conf <<- EOF

@@ -24,11 +24,24 @@ runner_config:
   # Reuse mode (not ephemeral)
   enable_ephemeral_runners: false
 
-  # Instance configuration
+  # Large instances for AOT compilation (200-520 GiB memory)
+  # Many types listed to maximize spot availability
   instance_types:
-    - m5.large
-    - c5.large
-    - m5a.large
+    - r6a.16xlarge    # 64 vCPUs, 512 GiB (AMD EPYC)
+    - r6i.16xlarge    # 64 vCPUs, 512 GiB (Intel)
+    - r5.16xlarge     # 64 vCPUs, 512 GiB
+    - r5a.16xlarge    # 64 vCPUs, 512 GiB (AMD)
+    - r5n.16xlarge    # 64 vCPUs, 512 GiB
+    - r5b.16xlarge    # 64 vCPUs, 512 GiB
+    - r6a.12xlarge    # 48 vCPUs, 384 GiB (AMD)
+    - r6i.12xlarge    # 48 vCPUs, 384 GiB (Intel)
+    - r5.12xlarge     # 48 vCPUs, 384 GiB
+    - r5a.12xlarge    # 48 vCPUs, 384 GiB (AMD)
+    - r5n.12xlarge    # 48 vCPUs, 384 GiB
+    - m6a.16xlarge    # 64 vCPUs, 256 GiB (AMD)
+    - m6i.16xlarge    # 64 vCPUs, 256 GiB (Intel)
+    - m5.16xlarge     # 64 vCPUs, 256 GiB
+    - m5a.16xlarge    # 64 vCPUs, 256 GiB (AMD)
 
   # Spot with on-demand failover
   instance_target_capacity_type: spot

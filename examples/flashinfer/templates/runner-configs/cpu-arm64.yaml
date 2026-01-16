@@ -22,10 +22,21 @@ runner_config:
 
   enable_ephemeral_runners: false
 
+  # Large instances for AOT compilation (200-400 GiB memory, 16-100 vCPUs)
+  # Many types listed to maximize spot availability
   instance_types:
-    - c6g.large
-    - t4g.large
-    - c6g.xlarge
+    - r8g.12xlarge    # 48 vCPUs, 384 GiB (Graviton4)
+    - r7g.12xlarge    # 48 vCPUs, 384 GiB (Graviton3)
+    - r6g.12xlarge    # 48 vCPUs, 384 GiB (Graviton2)
+    - m8g.16xlarge    # 64 vCPUs, 256 GiB (Graviton4)
+    - m7g.16xlarge    # 64 vCPUs, 256 GiB (Graviton3)
+    - m6g.16xlarge    # 64 vCPUs, 256 GiB (Graviton2)
+    - m8g.12xlarge    # 48 vCPUs, 192 GiB (Graviton4) - close to 200
+    - m7g.12xlarge    # 48 vCPUs, 192 GiB (Graviton3)
+    - m6g.12xlarge    # 48 vCPUs, 192 GiB (Graviton2)
+    - r8g.8xlarge     # 32 vCPUs, 256 GiB (Graviton4)
+    - r7g.8xlarge     # 32 vCPUs, 256 GiB (Graviton3)
+    - r6g.8xlarge     # 32 vCPUs, 256 GiB (Graviton2)
 
   instance_target_capacity_type: spot
   instance_allocation_strategy: price-capacity-optimized
