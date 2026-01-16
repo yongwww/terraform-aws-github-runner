@@ -11,6 +11,13 @@ runner_config:
   runner_name_prefix: flashinfer-cpu-x64-
   runner_run_as: ubuntu
 
+  # Allow IMDSv1 for compatibility with existing scripts (task_show_node_info.sh)
+  runner_metadata_options:
+    instance_metadata_tags: "enabled"
+    http_endpoint: "enabled"
+    http_tokens: "optional"
+    http_put_response_hop_limit: 2
+
   # Use Ubuntu-compatible user-data script
   userdata_template: ./templates/user-data.sh
 

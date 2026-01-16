@@ -46,13 +46,31 @@ systemctl start docker
 # Add ubuntu user to docker group
 usermod -aG docker $user_name
 
-# Configure NVIDIA Container Toolkit for Docker (Deep Learning AMI has it pre-installed)
+# Configure NVIDIA Container Toolkit for Docker
+# First, run nvidia-ctk to add the nvidia runtime
 nvidia-ctk runtime configure --runtime=docker
+
+# Then set nvidia as the default runtime to ensure --gpus all works correctly
+# This is needed because GitHub Actions container jobs use --gpus all
+if [ -f /etc/docker/daemon.json ]; then
+    # Add default-runtime if not already set
+    if ! grep -q '"default-runtime"' /etc/docker/daemon.json; then
+        jq '. + {"default-runtime": "nvidia"}' /etc/docker/daemon.json > /tmp/daemon.json.tmp
+        mv /tmp/daemon.json.tmp /etc/docker/daemon.json
+    fi
+else
+    echo '{"default-runtime": "nvidia", "runtimes": {"nvidia": {"path": "nvidia-container-runtime", "runtimeArgs": []}}}' > /etc/docker/daemon.json
+fi
+
+echo "=== Docker daemon.json ==="
+cat /etc/docker/daemon.json
+
+# Restart Docker to apply changes
 systemctl restart docker
 
-# Quick verification (don't pull external images, just check config)
+# Verify Docker configuration (no external image pull needed)
 echo "=== Docker GPU Runtime Config ==="
-docker info | grep -i runtime || true
+docker info | grep -iE "runtime|default" || true
 
 # Configure systemd for running service in users accounts
 mkdir -p /etc/systemd/system/user-$user_id.slice.d

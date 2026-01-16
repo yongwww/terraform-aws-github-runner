@@ -14,6 +14,13 @@ runner_config:
   runner_name_prefix: flashinfer-gpu-g4dn-
   runner_run_as: ubuntu
 
+  # Allow IMDSv1 for compatibility with existing scripts (task_show_node_info.sh)
+  runner_metadata_options:
+    instance_metadata_tags: "enabled"
+    http_endpoint: "enabled"
+    http_tokens: "optional"
+    http_put_response_hop_limit: 2
+
   # Use GPU-specific user-data script (Deep Learning AMI has Docker/NVIDIA pre-installed)
   userdata_template: ./templates/user-data-gpu.sh
 
