@@ -31,8 +31,8 @@ runner_config:
 
   # G4dn instances have NVIDIA T4 GPUs
   instance_types:
-    - g4dn.xlarge
-    - g4dn.2xlarge
+    - g4dn.4xlarge     # 16 vCPUs, 64 GiB, 1x T4
+    - g4dn.8xlarge     # 32 vCPUs, 128 GiB, 1x T4
 
   instance_target_capacity_type: spot
   instance_allocation_strategy: price-capacity-optimized
