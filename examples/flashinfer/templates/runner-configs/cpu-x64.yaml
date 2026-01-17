@@ -52,7 +52,8 @@ runner_config:
 
   # Spot with on-demand failover
   instance_target_capacity_type: spot
-  instance_allocation_strategy: price-capacity-optimized
+  # Use "capacity-optimized" (same as Jenkins) - prioritizes capacity stability over price
+  instance_allocation_strategy: capacity-optimized
   enable_on_demand_failover_for_errors:
     - InsufficientInstanceCapacity
 

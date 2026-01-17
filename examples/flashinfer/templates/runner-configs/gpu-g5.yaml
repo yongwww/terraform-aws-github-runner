@@ -37,14 +37,20 @@ runner_config:
   enable_ephemeral_runners: false
 
   # G5 instances have NVIDIA A10G GPUs
+  # More instance types = better spot availability
   instance_types:
+    - g5.2xlarge      # 8 vCPUs, 32 GiB, 1x A10G (best spot availability)
     - g5.4xlarge      # 16 vCPUs, 64 GiB, 1x A10G
     - g5.8xlarge      # 32 vCPUs, 128 GiB, 1x A10G
 
   instance_target_capacity_type: spot
-  instance_allocation_strategy: price-capacity-optimized
+  # Use "capacity-optimized" (same as Jenkins) - prioritizes capacity stability over price
+  instance_allocation_strategy: capacity-optimized
+  # Failover to on-demand when spot is unavailable or interrupted
   enable_on_demand_failover_for_errors:
     - InsufficientInstanceCapacity
+    - SpotMaxPriceTooLow
+    - MaxSpotInstanceCountExceeded
 
   runners_maximum_count: 10
   delay_webhook_event: 30

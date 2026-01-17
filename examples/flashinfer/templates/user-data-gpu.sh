@@ -52,9 +52,9 @@ nvidia-ctk runtime configure --runtime=docker
 
 # Configure Docker daemon with nvidia runtime and stability settings
 # - default-runtime: nvidia (for --gpus all support)
-# - live-restore: keep containers running during daemon restart
 # - max-concurrent-downloads: limit parallel layer downloads to reduce memory pressure
 # - max-concurrent-uploads: limit parallel layer uploads
+# Note: live-restore is NOT enabled as it can cause gRPC instability with nvidia-container-runtime
 cat > /etc/docker/daemon.json <<'DOCKER_CONFIG'
 {
     "default-runtime": "nvidia",
@@ -64,7 +64,6 @@ cat > /etc/docker/daemon.json <<'DOCKER_CONFIG'
             "runtimeArgs": []
         }
     },
-    "live-restore": true,
     "max-concurrent-downloads": 3,
     "max-concurrent-uploads": 3,
     "log-driver": "json-file",
