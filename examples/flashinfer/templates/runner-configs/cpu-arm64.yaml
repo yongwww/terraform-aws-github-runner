@@ -29,31 +29,59 @@ runner_config:
 
   enable_ephemeral_runners: false
 
-  # Large instances for AOT compilation (200-400 GiB memory, 16-100 vCPUs)
-  # Many types listed to maximize spot availability
+  # Large instances for AOT compilation (200-600 GiB memory)
+  # Many instance types for maximum spot availability (all Graviton/ARM64)
   instance_types:
+    # 512 GiB - r-series 16xlarge (Graviton)
+    - r8g.16xlarge    # 64 vCPUs, 512 GiB (Graviton4)
+    - r7g.16xlarge    # 64 vCPUs, 512 GiB (Graviton3)
+    - r6g.16xlarge    # 64 vCPUs, 512 GiB (Graviton2)
+    # 512 GiB - x2gd high-memory (Graviton2)
+    - x2gd.8xlarge    # 32 vCPUs, 512 GiB (Graviton2, NVMe)
+    # 384 GiB - r-series 12xlarge (Graviton)
     - r8g.12xlarge    # 48 vCPUs, 384 GiB (Graviton4)
     - r7g.12xlarge    # 48 vCPUs, 384 GiB (Graviton3)
     - r6g.12xlarge    # 48 vCPUs, 384 GiB (Graviton2)
-    - m8g.16xlarge    # 64 vCPUs, 256 GiB (Graviton4)
-    - m7g.16xlarge    # 64 vCPUs, 256 GiB (Graviton3)
-    - m6g.16xlarge    # 64 vCPUs, 256 GiB (Graviton2)
-    - m8g.12xlarge    # 48 vCPUs, 192 GiB (Graviton4) - close to 200
-    - m7g.12xlarge    # 48 vCPUs, 192 GiB (Graviton3)
-    - m6g.12xlarge    # 48 vCPUs, 192 GiB (Graviton2)
+    # 384 GiB - m-series 24xlarge (Graviton)
+    - m7g.24xlarge    # 96 vCPUs, 384 GiB (Graviton3)
+    - m6g.24xlarge    # 96 vCPUs, 384 GiB (Graviton2)
+    # 256 GiB - r-series 8xlarge (Graviton)
     - r8g.8xlarge     # 32 vCPUs, 256 GiB (Graviton4)
     - r7g.8xlarge     # 32 vCPUs, 256 GiB (Graviton3)
     - r6g.8xlarge     # 32 vCPUs, 256 GiB (Graviton2)
+    # 256 GiB - r-series with NVMe (Graviton)
+    - r6gd.8xlarge    # 32 vCPUs, 256 GiB (Graviton2, NVMe)
+    - r7gd.8xlarge    # 32 vCPUs, 256 GiB (Graviton3, NVMe)
+    # 256 GiB - m-series 16xlarge (Graviton)
+    - m8g.16xlarge    # 64 vCPUs, 256 GiB (Graviton4)
+    - m7g.16xlarge    # 64 vCPUs, 256 GiB (Graviton3)
+    - m6g.16xlarge    # 64 vCPUs, 256 GiB (Graviton2)
+    # 256 GiB - m-series with NVMe (Graviton)
+    - m6gd.16xlarge   # 64 vCPUs, 256 GiB (Graviton2, NVMe)
+    - m7gd.16xlarge   # 64 vCPUs, 256 GiB (Graviton3, NVMe)
+    # 256 GiB - x2gd high-memory (Graviton2)
+    - x2gd.4xlarge    # 16 vCPUs, 256 GiB (Graviton2, NVMe)
+    # 384 GiB - r-series with NVMe 12xlarge (Graviton)
+    - r6gd.12xlarge   # 48 vCPUs, 384 GiB (Graviton2, NVMe)
+    - r7gd.12xlarge   # 48 vCPUs, 384 GiB (Graviton3, NVMe)
+    # 512 GiB - r-series with NVMe 16xlarge (Graviton)
+    - r6gd.16xlarge   # 64 vCPUs, 512 GiB (Graviton2, NVMe)
+    - r7gd.16xlarge   # 64 vCPUs, 512 GiB (Graviton3, NVMe)
+    # im4gn storage optimized (Graviton2) - only 16xlarge meets 200 GiB threshold
+    - im4gn.16xlarge  # 64 vCPUs, 256 GiB (Graviton2, NVMe)
 
   instance_target_capacity_type: spot
-  # Use "capacity-optimized" (same as Jenkins) - prioritizes capacity stability over price
+  # Use "capacity-optimized" - prioritizes capacity stability
   instance_allocation_strategy: capacity-optimized
   enable_on_demand_failover_for_errors:
     - InsufficientInstanceCapacity
+    - SpotMaxPriceTooLow
+    - MaxSpotInstanceCountExceeded
 
   # NOT setting create_service_linked_role_spot (already created by cpu-x64)
 
-  runners_maximum_count: 5
+  # Increased from 5 to 10 - each workflow has 4 ARM AOT jobs
+  runners_maximum_count: 50
   delay_webhook_event: 30
   scale_down_schedule_expression: "cron(*/5 * * * ? *)"
   minimum_running_time_in_minutes: 10

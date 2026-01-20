@@ -52,7 +52,7 @@ runner_config:
     - SpotMaxPriceTooLow
     - MaxSpotInstanceCountExceeded
 
-  runners_maximum_count: 5
+  runners_maximum_count: 20
   delay_webhook_event: 30
   scale_down_schedule_expression: "cron(*/5 * * * ? *)"
   minimum_running_time_in_minutes: 15

@@ -31,24 +31,51 @@ runner_config:
   # Reuse mode (not ephemeral)
   enable_ephemeral_runners: false
 
-  # Large instances for AOT compilation (200-520 GiB memory)
-  # Many types listed to maximize spot availability
+  # Large instances for AOT compilation (300+ GiB memory, matching Jenkins' 300-520 GiB range)
+  # Many instance types for maximum spot availability
   instance_types:
+    # 512 GiB - r-series 16xlarge
     - r6a.16xlarge    # 64 vCPUs, 512 GiB (AMD EPYC)
     - r6i.16xlarge    # 64 vCPUs, 512 GiB (Intel)
+    - r6id.16xlarge   # 64 vCPUs, 512 GiB (Intel, NVMe)
+    - r6in.16xlarge   # 64 vCPUs, 512 GiB (Intel, network optimized)
     - r5.16xlarge     # 64 vCPUs, 512 GiB
     - r5a.16xlarge    # 64 vCPUs, 512 GiB (AMD)
-    - r5n.16xlarge    # 64 vCPUs, 512 GiB
-    - r5b.16xlarge    # 64 vCPUs, 512 GiB
+    - r5b.16xlarge    # 64 vCPUs, 512 GiB (EBS optimized)
+    - r5n.16xlarge    # 64 vCPUs, 512 GiB (network optimized)
+    - r5d.16xlarge    # 64 vCPUs, 512 GiB (NVMe)
+    - r5dn.16xlarge   # 64 vCPUs, 512 GiB (NVMe, network)
+    - r5ad.16xlarge   # 64 vCPUs, 512 GiB (AMD, NVMe)
+    - r7a.16xlarge    # 64 vCPUs, 512 GiB (AMD EPYC 4th gen)
+    - r7i.16xlarge    # 64 vCPUs, 512 GiB (Intel Sapphire Rapids)
+    - r7iz.16xlarge   # 64 vCPUs, 512 GiB (Intel, high freq)
+    # 384 GiB - r-series 12xlarge
     - r6a.12xlarge    # 48 vCPUs, 384 GiB (AMD)
     - r6i.12xlarge    # 48 vCPUs, 384 GiB (Intel)
+    - r6id.12xlarge   # 48 vCPUs, 384 GiB (Intel, NVMe)
+    - r6in.12xlarge   # 48 vCPUs, 384 GiB (Intel, network)
     - r5.12xlarge     # 48 vCPUs, 384 GiB
     - r5a.12xlarge    # 48 vCPUs, 384 GiB (AMD)
-    - r5n.12xlarge    # 48 vCPUs, 384 GiB
-    - m6a.16xlarge    # 64 vCPUs, 256 GiB (AMD)
-    - m6i.16xlarge    # 64 vCPUs, 256 GiB (Intel)
-    - m5.16xlarge     # 64 vCPUs, 256 GiB
-    - m5a.16xlarge    # 64 vCPUs, 256 GiB (AMD)
+    - r5b.12xlarge    # 48 vCPUs, 384 GiB (EBS optimized)
+    - r5n.12xlarge    # 48 vCPUs, 384 GiB (network)
+    - r5d.12xlarge    # 48 vCPUs, 384 GiB (NVMe)
+    - r5dn.12xlarge   # 48 vCPUs, 384 GiB (NVMe, network)
+    - r5ad.12xlarge   # 48 vCPUs, 384 GiB (AMD, NVMe)
+    - r7a.12xlarge    # 48 vCPUs, 384 GiB (AMD EPYC 4th gen)
+    - r7i.12xlarge    # 48 vCPUs, 384 GiB (Intel Sapphire Rapids)
+    # 384 GiB - m-series 24xlarge (96 vCPUs)
+    - m5.24xlarge     # 96 vCPUs, 384 GiB
+    - m5a.24xlarge    # 96 vCPUs, 384 GiB (AMD)
+    - m5n.24xlarge    # 96 vCPUs, 384 GiB (network)
+    - m5d.24xlarge    # 96 vCPUs, 384 GiB (NVMe)
+    - m5dn.24xlarge   # 96 vCPUs, 384 GiB (NVMe, network)
+    - m5ad.24xlarge   # 96 vCPUs, 384 GiB (AMD, NVMe)
+    - m6a.24xlarge    # 96 vCPUs, 384 GiB (AMD EPYC)
+    - m6i.24xlarge    # 96 vCPUs, 384 GiB (Intel)
+    - m6id.24xlarge   # 96 vCPUs, 384 GiB (Intel, NVMe)
+    - m6in.24xlarge   # 96 vCPUs, 384 GiB (Intel, network)
+    - m7a.24xlarge    # 96 vCPUs, 384 GiB (AMD EPYC 4th gen)
+    - m7i.24xlarge    # 96 vCPUs, 384 GiB (Intel Sapphire Rapids)
 
   # Spot with on-demand failover
   instance_target_capacity_type: spot
@@ -61,7 +88,7 @@ runner_config:
   create_service_linked_role_spot: true
 
   # Scaling configuration
-  runners_maximum_count: 10
+  runners_maximum_count: 50
   delay_webhook_event: 30
   scale_down_schedule_expression: "cron(*/5 * * * ? *)"
   minimum_running_time_in_minutes: 10
