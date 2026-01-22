@@ -1,17 +1,17 @@
-# T4 GPU (SM75 / Turing architecture)
+# T4 GPU (SM75 / Turing architecture) - On-Demand Runners (fallback for spot failures)
 matcherConfig:
   exactMatch: true
   labelMatchers:
-    - [self-hosted, linux, x64, gpu, sm75]
-    - [self-hosted, linux, x64, gpu, t4]
-    - [self-hosted, linux, x64, gpu, turing]
-  priority: 1
+    - [self-hosted, linux, x64, gpu, sm75, on-demand]
+    - [self-hosted, linux, x64, gpu, t4, on-demand]
+    - [self-hosted, linux, x64, gpu, turing, on-demand]
+  priority: 10
 fifo: true
 
 runner_config:
   runner_os: linux
   runner_architecture: x64
-  runner_name_prefix: flashinfer-gpu-g4dn-
+  runner_name_prefix: flashinfer-gpu-g4dn-od-
   runner_run_as: ubuntu
 
   # Allow IMDSv1 for compatibility with existing scripts (task_show_node_info.sh)
@@ -33,30 +33,27 @@ runner_config:
     - t4
     - sm75
     - turing
+    - on-demand
 
   enable_ephemeral_runners: false
 
   # G4dn instances have NVIDIA T4 GPUs
-  # More instance types = better spot availability
   instance_types:
-    - g4dn.2xlarge     # 8 vCPUs, 32 GiB, 1x T4 (best spot availability)
+    - g4dn.2xlarge     # 8 vCPUs, 32 GiB, 1x T4
     - g4dn.4xlarge     # 16 vCPUs, 64 GiB, 1x T4
     - g4dn.8xlarge     # 32 vCPUs, 128 GiB, 1x T4
 
-  instance_target_capacity_type: spot
-  # Use "capacity-optimized" (same as Jenkins) - prioritizes capacity stability over price
-  instance_allocation_strategy: capacity-optimized
-  # Failover to on-demand when spot is unavailable or interrupted
-  enable_on_demand_failover_for_errors:
-    - InsufficientInstanceCapacity
-    - SpotMaxPriceTooLow
-    - MaxSpotInstanceCountExceeded
+  # On-demand instances (no spot)
+  instance_target_capacity_type: on-demand
 
+  # Scaling configuration
   runners_maximum_count: 20
   delay_webhook_event: 30
   scale_down_schedule_expression: "cron(*/5 * * * ? *)"
   minimum_running_time_in_minutes: 15
   runner_boot_time_in_minutes: 15
+
+  # No idle_config - on-demand runners are fallback only, don't keep warm
 
   # Use AWS Deep Learning AMI with Ubuntu 22.04 (has NVIDIA drivers pre-installed)
   ami:
@@ -87,5 +84,3 @@ runner_config:
       prefix_log_group: true
       file_path: /var/log/user-data.log
       log_stream_name: "{instance_id}/user_data"
-
-  # userdata_post_install is now handled by userdata_template

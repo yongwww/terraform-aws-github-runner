@@ -1,7 +1,13 @@
+# CPU ARM64 Spot Runners
+# TODO: Explore removing backward-compat labels and using exactMatch: false
+#       to simplify config (job with fewer labels would match runner with more)
 matcherConfig:
   exactMatch: true
   labelMatchers:
+    # Backward compatible (current workflow)
     - [self-hosted, linux, arm64, cpu]
+    # Explicit spot label (for on-demand fallback workflow)
+    - [self-hosted, linux, arm64, cpu, spot]
   priority: 1
 fifo: true
 
@@ -26,6 +32,7 @@ runner_config:
   # Custom labels
   runner_extra_labels:
     - cpu
+    - spot
 
   enable_ephemeral_runners: false
 
@@ -116,5 +123,3 @@ runner_config:
       prefix_log_group: true
       file_path: /var/log/user-data.log
       log_stream_name: "{instance_id}/user_data"
-
-  # userdata_post_install is now handled by userdata_template

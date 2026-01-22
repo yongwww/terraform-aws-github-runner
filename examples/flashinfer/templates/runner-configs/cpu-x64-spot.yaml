@@ -1,7 +1,13 @@
+# CPU x64 Spot Runners
+# TODO: Explore removing backward-compat labels and using exactMatch: false
+#       to simplify config (job with fewer labels would match runner with more)
 matcherConfig:
   exactMatch: true
   labelMatchers:
+    # Backward compatible (current workflow)
     - [self-hosted, linux, x64, cpu]
+    # Explicit spot label (for on-demand fallback workflow)
+    - [self-hosted, linux, x64, cpu, spot]
   priority: 1
 fifo: true
 
@@ -27,6 +33,7 @@ runner_config:
   # Custom labels (added to default: self-hosted, linux, x64)
   runner_extra_labels:
     - cpu
+    - spot
 
   # Reuse mode (not ephemeral)
   enable_ephemeral_runners: false
@@ -94,7 +101,7 @@ runner_config:
   minimum_running_time_in_minutes: 10
   runner_boot_time_in_minutes: 10
 
-  # Keep 1 runner warm during work hours (PST 9am-6pm ≈ UTC 17:00-02:00)
+  # Keep 1 runner warm during work hours (PST 9am-6pm = UTC 17:00-02:00)
   idle_config:
     - cron: "* 17-23 * * 1-5"
       timeZone: "UTC"
@@ -134,5 +141,3 @@ runner_config:
       prefix_log_group: true
       file_path: /var/log/user-data.log
       log_stream_name: "{instance_id}/user_data"
-
-  # userdata_post_install is now handled by userdata_template
