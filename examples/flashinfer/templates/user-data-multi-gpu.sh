@@ -251,6 +251,9 @@ for gpu_id in $(seq 0 $((NUM_GPUS - 1))); do
         tar xzf "$RUNNER_BASE_DIR/actions-runner.tar.gz"
     fi
 
+    # Set ownership BEFORE running config.sh as the run_as user
+    chown -R "$run_as:$run_as" "$runner_dir"
+
     # Configure runner (if not already configured)
     if [[ ! -f ".runner" ]]; then
         echo "Configuring runner $runner_name..."
@@ -265,9 +268,6 @@ for gpu_id in $(seq 0 $((NUM_GPUS - 1))); do
     else
         echo "Runner already configured, skipping..."
     fi
-
-    # Set ownership
-    chown -R "$run_as:$run_as" "$runner_dir"
 
     # Create systemd service with GPU binding
     service_name="actions-runner-gpu$gpu_id"

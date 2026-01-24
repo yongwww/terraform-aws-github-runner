@@ -57,15 +57,15 @@ runner_config:
   # Capacity Block - requires an active CB reservation in the same AZ
   instance_target_capacity_type: capacity-block
 
-  # CB ID is NOT hardcoded - the Scale-up Lambda uses CapacityReservationOptions
-  # with UsageStrategy="use-capacity-reservations-first" to auto-discover active CBs
+  # CB ID is NOT hardcoded - the Scale-up Lambda dynamically discovers active CBs
+  # via DescribeCapacityReservations and uses RunInstances with explicit CB targeting
 
   # Capacity Blocks don't support spot allocation strategies
   # instance_allocation_strategy is ignored for capacity-block
   runners_maximum_count: 8
 
-  # IMPORTANT: 5 min delay gives CB Manager time to purchase/activate CB
-  # before scale-up Lambda tries CreateFleet
+  # 5 min delay allows time for CB to be purchased/activated if needed
+  # TODO: Add automatic CB purchase when no active CB is found
   delay_webhook_event: 300
 
   scale_down_schedule_expression: "cron(*/5 * * * ? *)"

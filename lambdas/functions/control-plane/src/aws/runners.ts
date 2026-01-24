@@ -425,10 +425,12 @@ async function createInstances(
     );
 
     if (!capacityBlockInfo) {
-      throw new Error(
+      // Throw ScaleError to trigger SQS retry - CB may be provisioning or not yet active
+      logger.warn(
         `No active Capacity Block found for instance types: ${runnerParameters.ec2instanceCriteria.instanceTypes.join(', ')}. ` +
-          'Ensure a Capacity Block reservation is active before requesting runners.',
+          'Will retry via SQS.',
       );
+      throw new ScaleError(1);
     }
 
     return await createInstancesFromCapacityBlock(
