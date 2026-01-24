@@ -174,7 +174,7 @@ resource "aws_cloudwatch_log_group" "cb_manager" {
 # =============================================================================
 # EventBridge Rule - Dynamic Trigger on Job Request
 # =============================================================================
-# This rule triggers CB Manager when a job with sm100/blackwell labels is queued.
+# This rule triggers CB Manager when a job with b200/blackwell labels is queued.
 # The CB Manager runs BEFORE scale-up (which has delay_webhook_event delay).
 
 # Get the EventBridge bus created by the runner module
@@ -188,13 +188,13 @@ resource "aws_cloudwatch_event_rule" "cb_preflight" {
   description    = "Trigger CB Manager when Blackwell/Hopper job is requested"
   event_bus_name = data.aws_cloudwatch_event_bus.runners.name
 
-  # Match workflow_job events with sm100, b200, or blackwell labels
+  # Match workflow_job events with b200 or blackwell labels
   event_pattern = jsonencode({
     detail-type = ["workflow_job"]
     detail = {
       workflow_job = {
         labels = [
-          { "equals-ignore-case" = "sm100" },
+          { "equals-ignore-case" = "b200" },
         ]
       }
     }
@@ -217,7 +217,7 @@ resource "aws_cloudwatch_event_rule" "cb_preflight_alt" {
   event_pattern = jsonencode({
     detail = {
       "requestedLabels" = [
-        { "equals-ignore-case" = "sm100" }
+        { "equals-ignore-case" = "b200" }
       ]
     }
   })
