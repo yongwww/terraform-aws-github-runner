@@ -344,8 +344,10 @@ def handler(event: Dict[str, Any], context) -> Dict[str, Any]:
 
     logger.info(f"Action: {action}, Instance Type: {instance_type}, AZ: {az}")
 
-    # Check for active CBs
-    active_cbs = get_active_capacity_blocks(instance_type, az)
+    # CRITICAL: Check for active CBs across ALL AZs to prevent duplicate purchases!
+    # We only filter by AZ when purchasing, not when checking for existing CBs.
+    active_cbs_all_az = get_active_capacity_blocks(instance_type, availability_zone=None)
+    active_cbs_this_az = get_active_capacity_blocks(instance_type, az) if az else active_cbs_all_az
 
     if action == 'check' or action == 'status':
         return {
@@ -353,17 +355,17 @@ def handler(event: Dict[str, Any], context) -> Dict[str, Any]:
             'action': action,
             'instance_type': instance_type,
             'availability_zone': az,
-            'active_capacity_blocks': active_cbs,
-            'has_active_cb': len(active_cbs) > 0,
+            'active_capacity_blocks': active_cbs_all_az,  # Show all CBs regardless of AZ
+            'has_active_cb': len(active_cbs_all_az) > 0,
         }
 
     if action == 'ensure':
         # IMPORTANT: Only allow ONE CB per instance type at a time to avoid wasting money.
-        # If ANY active/pending CB exists for this instance type, don't purchase another.
+        # If ANY active/pending CB exists for this instance type IN ANY AZ, don't purchase another.
         # The existing CB will become available when current jobs finish.
         
-        # Check for any active CB (regardless of available capacity)
-        active_any = [cb for cb in active_cbs if cb['state'] == 'active']
+        # Check for any active CB across ALL AZs (regardless of available capacity)
+        active_any = [cb for cb in active_cbs_all_az if cb['state'] == 'active']
         if active_any:
             cb = active_any[0]
             logger.info(f"Active CB exists for {instance_type}: {cb['reservation_id']} "
@@ -377,8 +379,8 @@ def handler(event: Dict[str, Any], context) -> Dict[str, Any]:
                 'capacity_block': cb,
             }
 
-        # Check if there's a pending CB
-        pending_cbs = [cb for cb in active_cbs if cb['state'] in ['pending', 'payment-pending']]
+        # Check if there's a pending CB across ALL AZs
+        pending_cbs = [cb for cb in active_cbs_all_az if cb['state'] in ['pending', 'payment-pending']]
         if pending_cbs:
             logger.info(f"CB purchase pending: {pending_cbs[0]['reservation_id']}")
             return {
