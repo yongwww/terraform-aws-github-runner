@@ -3,10 +3,13 @@ import {
   CreateFleetResult,
   CreateTagsCommand,
   DeleteTagsCommand,
+  DescribeCapacityReservationsCommand,
   DescribeInstancesCommand,
   DescribeInstancesResult,
+  DescribeSubnetsCommand,
   EC2Client,
   FleetLaunchTemplateOverridesRequest,
+  RunInstancesCommand,
   Tag,
   TerminateInstancesCommand,
   _InstanceType,
@@ -233,6 +236,164 @@ async function getAmiIdOverride(runnerParameters: Runners.RunnerInputParameters)
   }
 }
 
+/**
+ * Find an active Capacity Block reservation matching the requested instance types.
+ * Returns the CB ID and its availability zone if found.
+ */
+async function findActiveCapacityBlock(
+  ec2Client: EC2Client,
+  instanceTypes: string[],
+): Promise<{ capacityReservationId: string; availabilityZone: string } | null> {
+  try {
+    const response = await ec2Client.send(
+      new DescribeCapacityReservationsCommand({
+        Filters: [
+          { Name: 'state', Values: ['active'] },
+          { Name: 'instance-type', Values: instanceTypes },
+        ],
+      }),
+    );
+
+    // Find a capacity block with available capacity
+    const activeCB = response.CapacityReservations?.find(
+      (cr) => cr.ReservationType === 'capacity-block' && (cr.AvailableInstanceCount ?? 0) > 0,
+    );
+
+    if (activeCB && activeCB.CapacityReservationId && activeCB.AvailabilityZone) {
+      logger.info(
+        `Found active Capacity Block: ${activeCB.CapacityReservationId} in ${activeCB.AvailabilityZone} ` +
+          `with ${activeCB.AvailableInstanceCount} available instances`,
+      );
+      return {
+        capacityReservationId: activeCB.CapacityReservationId,
+        availabilityZone: activeCB.AvailabilityZone,
+      };
+    }
+
+    logger.warn('No active Capacity Block found with available capacity', {
+      instanceTypes,
+      reservationsFound: response.CapacityReservations?.length ?? 0,
+    });
+    return null;
+  } catch (e) {
+    logger.error('Failed to describe capacity reservations', { error: e });
+    throw e;
+  }
+}
+
+/**
+ * Find a subnet ID from the provided list that is in the specified availability zone.
+ */
+async function findSubnetInAz(
+  ec2Client: EC2Client,
+  subnetIds: string[],
+  availabilityZone: string,
+): Promise<string | null> {
+  try {
+    const response = await ec2Client.send(
+      new DescribeSubnetsCommand({
+        SubnetIds: subnetIds,
+        Filters: [{ Name: 'availability-zone', Values: [availabilityZone] }],
+      }),
+    );
+
+    const subnet = response.Subnets?.[0];
+    if (subnet?.SubnetId) {
+      logger.debug(`Found subnet ${subnet.SubnetId} in availability zone ${availabilityZone}`);
+      return subnet.SubnetId;
+    }
+
+    logger.warn(`No subnet found in availability zone ${availabilityZone}`, { subnetIds });
+    return null;
+  } catch (e) {
+    logger.error('Failed to describe subnets', { error: e });
+    throw e;
+  }
+}
+
+/**
+ * Create instances using RunInstances API for Capacity Block reservations.
+ * This is required because CreateFleet does not support auto-discovery for targeted Capacity Blocks.
+ */
+async function createInstancesFromCapacityBlock(
+  runnerParameters: Runners.RunnerInputParameters,
+  amiIdOverride: string | undefined,
+  ec2Client: EC2Client,
+  capacityBlockInfo: { capacityReservationId: string; availabilityZone: string },
+  tags: Tag[],
+): Promise<CreateFleetResult> {
+  // Find a subnet in the same AZ as the capacity block
+  const subnetId = await findSubnetInAz(ec2Client, runnerParameters.subnets, capacityBlockInfo.availabilityZone);
+
+  if (!subnetId) {
+    throw new Error(
+      `No subnet configured in availability zone ${capacityBlockInfo.availabilityZone} ` +
+        `where Capacity Block ${capacityBlockInfo.capacityReservationId} is located. ` +
+        `Configured subnets: ${runnerParameters.subnets.join(', ')}`,
+    );
+  }
+
+  logger.info('Creating instance from Capacity Block', {
+    capacityReservationId: capacityBlockInfo.capacityReservationId,
+    availabilityZone: capacityBlockInfo.availabilityZone,
+    subnetId,
+    instanceType: runnerParameters.ec2instanceCriteria.instanceTypes[0],
+    numberOfRunners: runnerParameters.numberOfRunners,
+  });
+
+  try {
+    const response = await ec2Client.send(
+      new RunInstancesCommand({
+        LaunchTemplate: {
+          LaunchTemplateName: runnerParameters.launchTemplateName,
+          Version: '$Default',
+        },
+        InstanceType: runnerParameters.ec2instanceCriteria.instanceTypes[0] as _InstanceType,
+        SubnetId: subnetId,
+        MinCount: runnerParameters.numberOfRunners,
+        MaxCount: runnerParameters.numberOfRunners,
+        ImageId: amiIdOverride,
+        InstanceMarketOptions: {
+          MarketType: 'capacity-block',
+        },
+        CapacityReservationSpecification: {
+          CapacityReservationTarget: {
+            CapacityReservationId: capacityBlockInfo.capacityReservationId,
+          },
+        },
+        TagSpecifications: [
+          {
+            ResourceType: 'instance',
+            Tags: tags,
+          },
+          {
+            ResourceType: 'volume',
+            Tags: tags,
+          },
+        ],
+      }),
+    );
+
+    // Wrap the RunInstances response in a CreateFleetResult-compatible structure
+    const instanceIds = response.Instances?.map((i) => i.InstanceId).filter((id): id is string => !!id) || [];
+
+    logger.info(`Successfully created ${instanceIds.length} instance(s) from Capacity Block`, {
+      instanceIds,
+      capacityReservationId: capacityBlockInfo.capacityReservationId,
+    });
+
+    const result: CreateFleetResult = {
+      Instances: [{ InstanceIds: instanceIds }],
+      Errors: [],
+    };
+
+    return result;
+  } catch (e) {
+    logger.warn('RunInstances for Capacity Block failed.', { error: e as Error });
+    throw e;
+  }
+}
+
 async function createInstances(
   runnerParameters: Runners.RunnerInputParameters,
   amiIdOverride: string | undefined,
@@ -250,11 +411,39 @@ async function createInstances(
     tags.push({ Key: 'ghr:trace_id', Value: traceId! });
   }
 
+  // For Capacity Blocks, use RunInstances API instead of CreateFleet
+  // CreateFleet does not support auto-discovery for targeted Capacity Blocks (InstanceMatchCriteria: targeted)
+  const isCapacityBlock = runnerParameters.ec2instanceCriteria.targetCapacityType === 'capacity-block';
+
+  if (isCapacityBlock) {
+    logger.info('Capacity Block target detected, using RunInstances API with dynamic CB discovery');
+
+    // Find an active Capacity Block for the requested instance types
+    const capacityBlockInfo = await findActiveCapacityBlock(
+      ec2Client,
+      runnerParameters.ec2instanceCriteria.instanceTypes,
+    );
+
+    if (!capacityBlockInfo) {
+      throw new Error(
+        `No active Capacity Block found for instance types: ${runnerParameters.ec2instanceCriteria.instanceTypes.join(', ')}. ` +
+          'Ensure a Capacity Block reservation is active before requesting runners.',
+      );
+    }
+
+    return await createInstancesFromCapacityBlock(
+      runnerParameters,
+      amiIdOverride,
+      ec2Client,
+      capacityBlockInfo,
+      tags,
+    );
+  }
+
+  // For spot and on-demand, use the standard CreateFleet API
   let fleet: CreateFleetResult;
   try {
     // see for spec https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateFleet.html
-    const isCapacityBlock = runnerParameters.ec2instanceCriteria.targetCapacityType === 'capacity-block';
-
     const createFleetCommand = new CreateFleetCommand({
       LaunchTemplateConfigs: [
         {
@@ -273,14 +462,6 @@ async function createInstances(
         MaxTotalPrice: runnerParameters.ec2instanceCriteria.maxSpotPrice,
         AllocationStrategy: runnerParameters.ec2instanceCriteria.instanceAllocationStrategy,
       },
-      // For Capacity Blocks, use OnDemandOptions to auto-discover active reservations in the target AZ
-      ...(isCapacityBlock && {
-        OnDemandOptions: {
-          CapacityReservationOptions: {
-            UsageStrategy: 'use-capacity-reservations-first',
-          },
-        },
-      }),
       TargetCapacitySpecification: {
         TotalTargetCapacity: runnerParameters.numberOfRunners,
         DefaultTargetCapacityType: runnerParameters.ec2instanceCriteria.targetCapacityType,
