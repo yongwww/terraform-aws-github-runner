@@ -1,10 +1,10 @@
-# B200 GPU (SM100 / Blackwell architecture) - Capacity Block Runners
-# Multi-GPU instance: 8x B200 GPUs, 8 runners per instance (one per GPU)
+# H100 GPU (SM90 / Hopper architecture) - Capacity Block Runners
+# Multi-GPU instance: 8x H100 GPUs, 8 runners per instance (one per GPU)
 #
 # AUTOMATIC CB PROVISIONING:
-# When a job with b200/sm100/blackwell label is queued:
+# When a job with h100/sm90/hopper label is queued:
 # 1. EventBridge triggers CB Manager Lambda immediately (label-based routing)
-# 2. CB Manager determines instance type from labels (b200 -> p6-b200.48xlarge)
+# 2. CB Manager determines instance type from labels (h100 -> p5.48xlarge)
 # 3. CB Manager checks for active CB, purchases if needed (~1-5 min)
 # 4. After delay_webhook_event (5 min), Scale-up Lambda runs
 # 5. Scale-up discovers active CB and launches instance with RunInstances API
@@ -13,16 +13,16 @@
 matcherConfig:
   exactMatch: true
   labelMatchers:
-    - [self-hosted, linux, x64, gpu, sm100]
-    - [self-hosted, linux, x64, gpu, b200]
-    - [self-hosted, linux, x64, gpu, blackwell]
+    - [self-hosted, linux, x64, gpu, sm90]
+    - [self-hosted, linux, x64, gpu, h100]
+    - [self-hosted, linux, x64, gpu, hopper]
   priority: 1
 fifo: true
 
 runner_config:
   runner_os: linux
   runner_architecture: x64
-  runner_name_prefix: flashinfer-gpu-p6-
+  runner_name_prefix: flashinfer-gpu-p5-
   runner_run_as: ubuntu
 
   # Allow IMDSv1 for compatibility with existing scripts
@@ -37,21 +37,21 @@ runner_config:
 
   enable_organization_runners: true
 
-  # Labels for Blackwell B200 GPUs
+  # Labels for Hopper H100 GPUs
   runner_extra_labels:
     - gpu
     - nvidia
-    - b200
-    - sm100
-    - blackwell
+    - h100
+    - sm90
+    - hopper
     - capacity-block
 
   # Non-ephemeral (reuse mode) - keep runners alive for full CB duration
   enable_ephemeral_runners: false
 
-  # p6-b200.48xlarge: 8x B200 GPUs, 192 vCPUs, 2TB RAM
+  # p5.48xlarge: 8x H100 GPUs, 192 vCPUs, 2TB RAM
   instance_types:
-    - p6-b200.48xlarge
+    - p5.48xlarge
 
   # Capacity Block - requires an active CB reservation in the same AZ
   instance_target_capacity_type: capacity-block
@@ -74,7 +74,6 @@ runner_config:
   # No idle_config - CB instances run for their full reservation period
 
   # Use AWS Deep Learning AMI with Ubuntu 22.04
-  # TODO: Verify this AMI supports B200/SM100 drivers
   ami:
     owners:
       - "898082745236"

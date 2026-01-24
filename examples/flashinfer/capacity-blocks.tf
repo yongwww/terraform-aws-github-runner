@@ -17,19 +17,11 @@ locals {
   cb_manager_name = "${local.environment}-cb-manager"
 
   # Capacity Block configuration
+  # Note: Instance type selection is now dynamic based on job labels.
+  # The Lambda maps labels -> instance types (see LABEL_TO_INSTANCE_TYPE in index.py)
   cb_config = {
-    # P6 Blackwell (B200)
-    p6_blackwell = {
-      instance_type  = "p6-b200.48xlarge"
-      duration_hours = 24  # Minimum 1 day
-      enabled        = true
-    }
-    # P5 Hopper (H100) - for future use
-    p5_hopper = {
-      instance_type  = "p5.48xlarge"
-      duration_hours = 24
-      enabled        = false  # Enable when needed
-    }
+    # Default settings (used when no specific instance type is determined)
+    default_duration_hours = 24 # Minimum 1 day for CBs
   }
 }
 
@@ -58,11 +50,12 @@ resource "aws_lambda_function" "cb_manager" {
 
   environment {
     variables = {
-      INSTANCE_TYPE     = local.cb_config.p6_blackwell.instance_type
-      DURATION_HOURS    = tostring(local.cb_config.p6_blackwell.duration_hours)
-      SSM_PREFIX        = "/flashinfer/capacity-blocks"
-      SUBNET_IDS        = join(",", module.base.vpc.private_subnets)
-      LOG_LEVEL         = "INFO"
+      # INSTANCE_TYPE is now determined dynamically from job labels
+      # See LABEL_TO_INSTANCE_TYPE mapping in index.py
+      DURATION_HOURS = tostring(local.cb_config.default_duration_hours)
+      SSM_PREFIX     = "/flashinfer/capacity-blocks"
+      SUBNET_IDS     = join(",", module.base.vpc.private_subnets)
+      LOG_LEVEL      = "INFO"
     }
   }
 
@@ -179,22 +172,30 @@ resource "aws_cloudwatch_log_group" "cb_manager" {
 
 # Get the EventBridge bus created by the runner module
 data "aws_cloudwatch_event_bus" "runners" {
-  name = "${local.environment}-runners"  # Created by module.runners.webhook.eventbridge
+  name = "${local.environment}-runners" # Created by module.runners.webhook.eventbridge
 }
 
-# Rule: Trigger CB Manager for Blackwell job requests
+# Rule: Trigger CB Manager for Capacity Block job requests (Blackwell or Hopper)
 resource "aws_cloudwatch_event_rule" "cb_preflight" {
   name           = "${local.cb_manager_name}-preflight"
   description    = "Trigger CB Manager when Blackwell/Hopper job is requested"
   event_bus_name = data.aws_cloudwatch_event_bus.runners.name
 
-  # Match workflow_job events with b200 or blackwell labels
+  # Match workflow_job events with any CB-requiring labels
+  # Labels: b200, sm100, blackwell (Blackwell) or h100, sm90, hopper (Hopper)
   event_pattern = jsonencode({
     detail-type = ["workflow_job"]
     detail = {
       workflow_job = {
         labels = [
+          # Blackwell labels
           { "equals-ignore-case" = "b200" },
+          { "equals-ignore-case" = "sm100" },
+          { "equals-ignore-case" = "blackwell" },
+          # Hopper labels
+          { "equals-ignore-case" = "h100" },
+          { "equals-ignore-case" = "sm90" },
+          { "equals-ignore-case" = "hopper" },
         ]
       }
     }
@@ -211,13 +212,20 @@ resource "aws_cloudwatch_event_rule" "cb_preflight" {
 # (GitHub webhook format may vary)
 resource "aws_cloudwatch_event_rule" "cb_preflight_alt" {
   name           = "${local.cb_manager_name}-preflight-alt"
-  description    = "Alternative trigger pattern for Blackwell jobs"
+  description    = "Alternative trigger pattern for CB jobs"
   event_bus_name = data.aws_cloudwatch_event_bus.runners.name
 
   event_pattern = jsonencode({
     detail = {
       "requestedLabels" = [
-        { "equals-ignore-case" = "b200" }
+        # Blackwell labels
+        { "equals-ignore-case" = "b200" },
+        { "equals-ignore-case" = "sm100" },
+        { "equals-ignore-case" = "blackwell" },
+        # Hopper labels
+        { "equals-ignore-case" = "h100" },
+        { "equals-ignore-case" = "sm90" },
+        { "equals-ignore-case" = "hopper" },
       ]
     }
   })
@@ -237,6 +245,7 @@ resource "aws_cloudwatch_event_target" "cb_manager" {
   arn            = aws_lambda_function.cb_manager.arn
 
   # Transform the event to CB Manager format
+  # Lambda determines instance_type from labels (no hardcoding here)
   input_transformer {
     input_paths = {
       labels = "$.detail.workflow_job.labels"
@@ -244,7 +253,6 @@ resource "aws_cloudwatch_event_target" "cb_manager" {
     input_template = <<EOF
 {
   "action": "ensure",
-  "instance_type": "${local.cb_config.p6_blackwell.instance_type}",
   "source": "eventbridge",
   "labels": <labels>
 }
@@ -258,11 +266,19 @@ resource "aws_cloudwatch_event_target" "cb_manager_alt" {
   target_id      = "cb-manager-alt"
   arn            = aws_lambda_function.cb_manager.arn
 
-  input = jsonencode({
-    action        = "ensure"
-    instance_type = local.cb_config.p6_blackwell.instance_type
-    source        = "eventbridge-alt"
-  })
+  # Pass requestedLabels for the alt pattern
+  input_transformer {
+    input_paths = {
+      labels = "$.detail.requestedLabels"
+    }
+    input_template = <<EOF
+{
+  "action": "ensure",
+  "source": "eventbridge-alt",
+  "labels": <labels>
+}
+EOF
+  }
 }
 
 # Permission for EventBridge to invoke CB Manager
@@ -286,20 +302,34 @@ resource "aws_lambda_permission" "eventbridge_cb_manager_alt" {
 # Manual Invocation Examples
 # =============================================================================
 #
-# Check CB status:
+# Check CB status (using labels - Lambda determines instance type):
 #   aws lambda invoke --function-name flashinfer-cb-manager \
-#     --payload '{"action": "status", "instance_type": "p6-b200.48xlarge"}' \
+#     --payload '{"action": "status", "labels": ["b200"]}' \
 #     response.json
 #
-# Ensure CB exists (purchase if needed):
+# Check CB status (explicit instance type):
 #   aws lambda invoke --function-name flashinfer-cb-manager \
-#     --payload '{"action": "ensure", "instance_type": "p6-b200.48xlarge"}' \
+#     --payload '{"action": "status", "instance_type": "p5.48xlarge"}' \
 #     response.json
 #
-# Force purchase new CB:
+# Ensure CB exists for Blackwell (purchase if needed):
+#   aws lambda invoke --function-name flashinfer-cb-manager \
+#     --payload '{"action": "ensure", "labels": ["b200"]}' \
+#     response.json
+#
+# Ensure CB exists for Hopper (purchase if needed):
+#   aws lambda invoke --function-name flashinfer-cb-manager \
+#     --payload '{"action": "ensure", "labels": ["h100"]}' \
+#     response.json
+#
+# Force purchase new CB (explicit instance type):
 #   aws lambda invoke --function-name flashinfer-cb-manager \
 #     --payload '{"action": "purchase", "instance_type": "p6-b200.48xlarge"}' \
 #     response.json
+#
+# Supported labels -> instance types:
+#   b200, sm100, blackwell -> p6-b200.48xlarge
+#   h100, sm90, hopper     -> p5.48xlarge
 # =============================================================================
 
 # =============================================================================
