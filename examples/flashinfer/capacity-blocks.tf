@@ -98,6 +98,8 @@ resource "aws_iam_role_policy" "cb_manager" {
   name = "${local.cb_manager_name}-policy"
   role = aws_iam_role.cb_manager.id
 
+  # READ-ONLY policy - CB purchase is DISABLED
+  # CBs must be purchased manually via AWS Console
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -111,43 +113,19 @@ resource "aws_iam_role_policy" "cb_manager" {
         ]
         Resource = "arn:aws:logs:*:*:*"
       },
-      # EC2 Capacity Block operations
+      # EC2 Capacity Block read-only operations
       {
         Effect = "Allow"
         Action = [
-          "ec2:DescribeCapacityReservations",
-          "ec2:DescribeCapacityBlockOfferings",
-          "ec2:PurchaseCapacityBlock"
+          "ec2:DescribeCapacityReservations"
+          # REMOVED: ec2:DescribeCapacityBlockOfferings (purchase disabled)
+          # REMOVED: ec2:PurchaseCapacityBlock (purchase disabled)
         ]
         Resource = "*"
-      },
-      # EC2 Subnet info (for AZ detection)
-      {
-        Effect = "Allow"
-        Action = [
-          "ec2:DescribeSubnets"
-        ]
-        Resource = "*"
-      },
-      # EC2 tagging for purchased CBs
-      {
-        Effect = "Allow"
-        Action = [
-          "ec2:CreateTags"
-        ]
-        Resource = "arn:aws:ec2:*:*:capacity-reservation/*"
-      },
-      # SSM for state tracking and locking
-      {
-        Effect = "Allow"
-        Action = [
-          "ssm:GetParameter",
-          "ssm:PutParameter",
-          "ssm:DeleteParameter",
-          "ssm:GetParametersByPath"
-        ]
-        Resource = "arn:aws:ssm:*:*:parameter/flashinfer/capacity-blocks/*"
       }
+      # REMOVED: ec2:DescribeSubnets (not needed for read-only)
+      # REMOVED: ec2:CreateTags (purchase disabled)
+      # REMOVED: SSM permissions (purchase/locking disabled)
     ]
   })
 }
@@ -167,8 +145,10 @@ resource "aws_cloudwatch_log_group" "cb_manager" {
 # =============================================================================
 # EventBridge Rule - Dynamic Trigger on Job Request
 # =============================================================================
-# This rule triggers CB Manager when a job with b200/blackwell labels is queued.
-# The CB Manager runs BEFORE scale-up (which has delay_webhook_event delay).
+# DISABLED: Automatic CB purchase is disabled to prevent accidental duplicate
+# purchases. CBs must be purchased manually via AWS Console or CLI.
+#
+# To re-enable, set is_enabled = true below or remove the state = "DISABLED"
 
 # Get the EventBridge bus created by the runner module
 data "aws_cloudwatch_event_bus" "runners" {
@@ -176,10 +156,12 @@ data "aws_cloudwatch_event_bus" "runners" {
 }
 
 # Rule: Trigger CB Manager for Capacity Block job requests (Blackwell or Hopper)
+# DISABLED - automatic CB purchase is too risky
 resource "aws_cloudwatch_event_rule" "cb_preflight" {
   name           = "${local.cb_manager_name}-preflight"
-  description    = "Trigger CB Manager when Blackwell/Hopper job is requested"
+  description    = "Trigger CB Manager when Blackwell/Hopper job is requested (DISABLED)"
   event_bus_name = data.aws_cloudwatch_event_bus.runners.name
+  state          = "DISABLED" # DISABLED to prevent automatic CB purchases
 
   # Match workflow_job events with any CB-requiring labels
   # Labels: b200, sm100, blackwell (Blackwell) or h100, sm90, hopper (Hopper)
@@ -210,10 +192,12 @@ resource "aws_cloudwatch_event_rule" "cb_preflight" {
 
 # Alternative rule pattern if the above doesn't match
 # (GitHub webhook format may vary)
+# DISABLED - automatic CB purchase is too risky
 resource "aws_cloudwatch_event_rule" "cb_preflight_alt" {
   name           = "${local.cb_manager_name}-preflight-alt"
-  description    = "Alternative trigger pattern for CB jobs"
+  description    = "Alternative trigger pattern for CB jobs (DISABLED)"
   event_bus_name = data.aws_cloudwatch_event_bus.runners.name
+  state          = "DISABLED" # DISABLED to prevent automatic CB purchases
 
   event_pattern = jsonencode({
     detail = {
