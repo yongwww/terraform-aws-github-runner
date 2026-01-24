@@ -253,6 +253,8 @@ async function createInstances(
   let fleet: CreateFleetResult;
   try {
     // see for spec https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateFleet.html
+    const isCapacityBlock = runnerParameters.ec2instanceCriteria.targetCapacityType === 'capacity-block';
+
     const createFleetCommand = new CreateFleetCommand({
       LaunchTemplateConfigs: [
         {
@@ -271,6 +273,14 @@ async function createInstances(
         MaxTotalPrice: runnerParameters.ec2instanceCriteria.maxSpotPrice,
         AllocationStrategy: runnerParameters.ec2instanceCriteria.instanceAllocationStrategy,
       },
+      // For Capacity Blocks, use OnDemandOptions to auto-discover active reservations in the target AZ
+      ...(isCapacityBlock && {
+        OnDemandOptions: {
+          CapacityReservationOptions: {
+            UsageStrategy: 'use-capacity-reservations-first',
+          },
+        },
+      }),
       TargetCapacitySpecification: {
         TotalTargetCapacity: runnerParameters.numberOfRunners,
         DefaultTargetCapacityType: runnerParameters.ec2instanceCriteria.targetCapacityType,
