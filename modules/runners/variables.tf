@@ -91,13 +91,13 @@ variable "ebs_optimized" {
 }
 
 variable "instance_target_capacity_type" {
-  description = "Default lifecycle used runner instances, can be either `spot` or `on-demand`."
+  description = "Default lifecycle used runner instances, can be either `spot`, `on-demand`, or `capacity-block`."
   type        = string
   default     = "spot"
 
   validation {
-    condition     = contains(["spot", "on-demand"], var.instance_target_capacity_type)
-    error_message = "The instance target capacity should be either spot or on-demand."
+    condition     = contains(["spot", "on-demand", "capacity-block"], var.instance_target_capacity_type)
+    error_message = "The instance target capacity should be either spot, on-demand, or capacity-block."
   }
 }
 

@@ -186,6 +186,15 @@ resource "aws_launch_template" "runner" {
     }
   }
 
+  # Instance market options for Capacity Block support
+  # When instance_target_capacity_type is "capacity-block", we must specify market_type
+  dynamic "instance_market_options" {
+    for_each = var.instance_target_capacity_type == "capacity-block" ? [1] : []
+    content {
+      market_type = "capacity-block"
+    }
+  }
+
   monitoring {
     enabled = var.enable_runner_detailed_monitoring
   }

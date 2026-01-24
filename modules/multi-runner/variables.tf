@@ -215,7 +215,7 @@ variable "multi_runner_config" {
         enable_userdata: "Should the userdata script be enabled for the runner. Set this to false if you are using your own prebuilt AMI."
         instance_allocation_strategy: "The allocation strategy for spot instances. AWS recommends to use `capacity-optimized` however the AWS default is `lowest-price`."
         instance_max_spot_price: "Max price price for spot instances per hour. This variable will be passed to the create fleet as max spot price for the fleet."
-        instance_target_capacity_type: "Default lifecycle used for runner instances, can be either `spot` or `on-demand`."
+        instance_target_capacity_type: "Default lifecycle used for runner instances, can be either `spot`, `on-demand`, or `capacity-block`."
         instance_types: "List of instance types for the action runner. Defaults are based on runner_os (al2023 for linux and Windows Server Core for win)."
         job_queue_retention_in_seconds: "The number of seconds the job is held in the queue before it is purged"
         minimum_running_time_in_minutes: "The time an ec2 action runner should be running at minimum before terminated if not busy."

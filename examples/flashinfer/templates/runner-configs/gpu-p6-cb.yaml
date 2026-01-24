@@ -1,0 +1,103 @@
+# B200 GPU (SM100 / Blackwell architecture) - Capacity Block Runners
+# Multi-GPU instance: 8x B200 GPUs, 8 runners per instance (one per GPU)
+#
+# DYNAMIC CB MANAGEMENT:
+# When a job with sm100 label is queued:
+# 1. EventBridge triggers CB Manager Lambda immediately
+# 2. CB Manager checks for active CB, purchases if needed (~1-5 min)
+# 3. After delay_webhook_event (5 min), Scale-up Lambda runs
+# 4. Scale-up creates EC2 Fleet into the now-active CB
+# 5. User-data registers 8 runners (one per GPU)
+#
+# No manual CB purchase required - fully automated!
+#
+matcherConfig:
+  exactMatch: true
+  labelMatchers:
+    - [self-hosted, linux, x64, gpu, sm100]
+    - [self-hosted, linux, x64, gpu, b200]
+    - [self-hosted, linux, x64, gpu, blackwell]
+  priority: 1
+fifo: true
+
+runner_config:
+  runner_os: linux
+  runner_architecture: x64
+  runner_name_prefix: flashinfer-gpu-p6-
+  runner_run_as: ubuntu
+
+  # Allow IMDSv1 for compatibility with existing scripts
+  runner_metadata_options:
+    instance_metadata_tags: "enabled"
+    http_endpoint: "enabled"
+    http_tokens: "optional"
+    http_put_response_hop_limit: 2
+
+  # Use multi-GPU user-data script (registers 8 runners, one per GPU)
+  userdata_template: ./templates/user-data-multi-gpu.sh
+
+  enable_organization_runners: true
+
+  # Labels for Blackwell B200 GPUs
+  runner_extra_labels:
+    - gpu
+    - nvidia
+    - b200
+    - sm100
+    - blackwell
+    - capacity-block
+
+  # Non-ephemeral (reuse mode) - keep runners alive for full CB duration
+  enable_ephemeral_runners: false
+
+  # p6-b200.48xlarge: 8x B200 GPUs, 192 vCPUs, 2TB RAM
+  instance_types:
+    - p6-b200.48xlarge
+
+  # Capacity Block - requires an active CB reservation in the same AZ
+  instance_target_capacity_type: capacity-block
+
+  # Capacity Blocks don't support spot allocation strategies
+  # instance_allocation_strategy is ignored for capacity-block
+  runners_maximum_count: 8
+
+  # IMPORTANT: 5 min delay gives CB Manager time to purchase/activate CB
+  # before scale-up Lambda tries CreateFleet
+  delay_webhook_event: 300
+
+  scale_down_schedule_expression: "cron(*/5 * * * ? *)"
+  minimum_running_time_in_minutes: 60
+  runner_boot_time_in_minutes: 15
+
+  # No idle_config - CB instances run for their full reservation period
+
+  # Use AWS Deep Learning AMI with Ubuntu 22.04
+  # TODO: Verify this AMI supports B200/SM100 drivers
+  ami:
+    owners:
+      - "898082745236"
+    filter:
+      name:
+        - "Deep Learning OSS Nvidia Driver AMI GPU PyTorch 2.* (Ubuntu 22.04) *"
+      state:
+        - available
+
+  block_device_mappings:
+    - device_name: /dev/sda1
+      volume_size: 1000  # Larger disk for 8 parallel runners
+      volume_type: gp3
+      delete_on_termination: true
+      encrypted: true
+
+  enable_ssm_on_runners: true
+  enable_cloudwatch_agent: true
+
+  runner_log_files:
+    - log_group_name: syslog
+      prefix_log_group: true
+      file_path: /var/log/syslog
+      log_stream_name: "{instance_id}"
+    - log_group_name: user_data
+      prefix_log_group: true
+      file_path: /var/log/user-data.log
+      log_stream_name: "{instance_id}/user_data"
